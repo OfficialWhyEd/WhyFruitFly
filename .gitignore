@@ -1,0 +1,26 @@
+venv/
+**/__pycache__/
+*.py[cod]
+
+# Dati scientifici e risultati gia presenti, troppo grandi per Git.
+cervello/modello/*.parquet
+cervello/modello/*.csv
+cervello/modello/*.pickle
+cervello/modello/results/
+prove/risultati/
+prove/*.mp4
+prove/*.png
+prove/*.log
+
+# Artefatti generati dal laboratorio.
+lab/data/
+lab/frontend/node_modules/
+lab/frontend/dist/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Configurazione locale e segreti.
+.env
+.env.*
+!.env.example

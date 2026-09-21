@@ -2,11 +2,10 @@ venv/
 **/__pycache__/
 *.py[cod]
 
+# Il modello cerebrale e gia un repository Git indipendente.
+cervello/modello/
+
 # Dati scientifici e risultati gia presenti, troppo grandi per Git.
-cervello/modello/*.parquet
-cervello/modello/*.csv
-cervello/modello/*.pickle
-cervello/modello/results/
 prove/risultati/
 prove/*.mp4
 prove/*.png

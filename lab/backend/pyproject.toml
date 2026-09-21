@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fruitfly-lab"
+version = "0.1.0"
+description = "Local experiment engine for the Fruit Fly Lab"
+requires-python = ">=3.12"
+dependencies = [
+    "flygym==2.1.0",
+    "numpy>=2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fruitfly_lab*"]
+

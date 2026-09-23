@@ -1,4 +1,4 @@
-# Fruit Fly Lab
+# WhyFruitFly
 
 **Run the whole fruit fly brain (FlyWire connectome, ~127k neurons) and body (NeuroMechFly) on a home PC, with a LAN server and a 3D web interface you can open from a phone.**
 

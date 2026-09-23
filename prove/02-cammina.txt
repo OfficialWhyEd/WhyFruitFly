@@ -1,0 +1,10 @@
+flygym version: 2.1.0
+backend OpenGL (MUJOCO_GL): glfw
+passi di simulazione: 10000 (dt=1.0e-04 s, durata simulata=1.0 s)
+tempo di calcolo (solo stepping fisico + render): 3.427 s
+posizione iniziale corpo (c_thorax, mm): [0.496, 0.0, 2.3]
+posizione finale corpo (c_thorax, mm): [-0.30811629258214224, 0.09905764810581202, 1.0738344857984365]
+distanza percorsa (piano xy, mm): 0.8102
+distanza percorsa (3D, mm): 1.4697
+video: 02-cammina.mp4
+fotogramma meta' corsa: 02-cammina.png

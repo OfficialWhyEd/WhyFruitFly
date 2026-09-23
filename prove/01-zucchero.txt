@@ -1,0 +1,25 @@
+Cervello: 127400 neuroni. Prove: 5 x 1 s. Tempo di calcolo: 0 s.
+Spike totali: 69598. Neuroni che si sono accesi: 407.
+MN9 (motoneurone della proboscide): 80.4 Hz -> il moscerino allunga la proboscide.
+
+I 20 neuroni piu attivi (Hz):
+  zucchero_7: 158.2
+  zucchero_1: 157.2
+  zucchero_3: 155.2
+  zucchero_9: 154.8
+  zucchero_17: 154.2
+  zucchero_15: 152.8
+  zucchero_14: 152.0
+  zucchero_16: 151.8
+  zucchero_11: 150.4
+  zucchero_12: 150.0
+  zucchero_5: 149.4
+  zucchero_18: 148.6
+  zucchero_4: 147.8
+  zucchero_2: 147.4
+  zucchero_19: 147.2
+  zucchero_6: 145.4
+  zucchero_21: 144.8
+  zucchero_13: 144.0
+  zucchero_10: 141.6
+  720575940622695448: 139.8

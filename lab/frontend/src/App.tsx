@@ -9,7 +9,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FlyViewport } from './FlyViewport'
 import { telemetry } from './telemetry'
-import type { LabMessage, Metadata, Snapshot } from './types'
+import type { ArchiveInfo, LabMessage, Metadata, RunSummary, Snapshot } from './types'
 
 type ConnectionState = 'connecting' | 'online' | 'offline' | 'error'
 
@@ -19,6 +19,29 @@ const labels: Record<string, string> = {
   paused: 'In pausa',
   stopped: 'Arrestata',
   closed: 'Chiusa',
+}
+
+const stateLabels: Record<string, string> = {
+  recording: 'In registrazione',
+  finalizing: 'Chiusura',
+  sealed: 'Sigillata',
+  failed: 'Errore',
+  interrupted: 'Interrotta',
+}
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(2) + ' GB'
+  if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(1) + ' MB'
+  return Math.round(bytes / 1024) + ' kB'
+}
+
+// crypto.randomUUID exists only on secure origins; the LAN link is plain http.
+function requestId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20)
 }
 
 function websocketUrl() {
@@ -35,6 +58,27 @@ export default function App() {
   const [metadata, setMetadata] = useState<Metadata | null>(null)
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [archive, setArchive] = useState<ArchiveInfo | null>(null)
+  const [runs, setRuns] = useState<RunSummary[]>([])
+
+  const refreshArchive = useCallback(async () => {
+    try {
+      const [info, list] = await Promise.all([
+        fetch('/api/archive', { credentials: 'same-origin' }),
+        fetch('/api/runs?limit=6', { credentials: 'same-origin' }),
+      ])
+      if (info.ok) setArchive(await info.json())
+      if (list.ok) setRuns((await list.json()).runs)
+    } catch {
+      // The live channel shows the connection problem already.
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshArchive()
+    const timer = window.setInterval(refreshArchive, 8000)
+    return () => window.clearInterval(timer)
+  }, [refreshArchive])
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return
@@ -57,6 +101,9 @@ export default function App() {
           setSnapshot(message.payload)
           summaryTimer.current = now
         }
+      } else if (message.type === 'archive') {
+        refreshArchive()
+        if (message.event === 'failed') setError('Archivio: ' + (message.error ?? 'run non sigillata'))
       } else if (message.type === 'error' || message.type === 'fatal') {
         setError(message.error)
         setConnection('error')
@@ -67,7 +114,7 @@ export default function App() {
       reconnectRef.current = window.setTimeout(connect, 1500)
     })
     socket.addEventListener('error', () => setConnection('error'))
-  }, [])
+  }, [refreshArchive])
 
   useEffect(() => {
     connect()
@@ -83,13 +130,15 @@ export default function App() {
       setError('Il telefono non e collegato al motore. Attendi la riconnessione.')
       return
     }
-    socket.send(JSON.stringify({ type, request_id: crypto.randomUUID() }))
+    socket.send(JSON.stringify({ type, request_id: requestId() }))
   }
 
   const status = snapshot?.status ?? 'starting'
   const rootPosition = snapshot?.body_pos_mm?.[0]
   const contacts = snapshot?.contact_found.filter(Boolean).length ?? 0
   const connected = connection === 'online'
+  const recording = Boolean(archive?.recording_run_id)
+  const freeGb = archive?.free_bytes !== undefined ? archive.free_bytes / 1024 ** 3 : null
 
   return (
     <main className="lab-shell">
@@ -129,7 +178,35 @@ export default function App() {
           <span>Esperimento attivo</span>
           <strong>Camminata a tripode</strong>
           <p>Fisica MuJoCo sul PC. Il telefono riceve soltanto lo stato verificato.</p>
+
+          <section className="archive" aria-label="Archivio">
+            <span>Archivio</span>
+            <p className={recording ? 'archive-rec archive-rec--on' : 'archive-rec'}>
+              {recording ? 'Registrazione in corso' : 'Nessuna registrazione'}
+            </p>
+            <dl>
+              <div><dt>Run salvate</dt><dd>{archive?.by_state?.sealed ?? 0}</dd></div>
+              <div><dt>Interrotte</dt><dd>{(archive?.by_state?.interrupted ?? 0) + (archive?.by_state?.failed ?? 0)}</dd></div>
+              <div><dt>Spazio usato</dt><dd>{formatBytes(archive?.stored_bytes ?? 0)}</dd></div>
+              <div><dt>Disco libero</dt><dd>{freeGb === null ? '...' : freeGb.toFixed(1) + ' GB'}</dd></div>
+            </dl>
+            <ol className="run-list">
+              {runs.map((run) => (
+                <li key={run.id} data-state={run.state}>
+                  <code>{run.id.slice(0, 8)}</code>
+                  <span>{stateLabels[run.state] ?? run.state}</span>
+                  <span>{(run.metrics.sim_duration_s ?? 0).toFixed(2)} s</span>
+                  <span>{(run.metrics.displacement_mm ?? 0).toFixed(2)} mm</span>
+                </li>
+              ))}
+            </ol>
+          </section>
         </aside>
+
+        <p className="archive-strip" aria-live="polite">
+          <i className={recording ? 'rec-dot rec-dot--on' : 'rec-dot'} aria-hidden="true" />
+          {recording ? 'Sto registrando' : 'Archivio'} / {archive?.by_state?.sealed ?? 0} run salvate / {freeGb === null ? '...' : freeGb.toFixed(0) + ' GB liberi'}
+        </p>
       </section>
 
       {error && <div className="error-strip" role="alert"><strong>Motore:</strong> {error}</div>}

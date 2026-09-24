@@ -115,3 +115,19 @@ Verifica:
 - Controllare hash, migrazioni, artefatti orfani, porte, firewall e assenza di segreti.
 - Documentare un unico comando gestito per avvio e arresto, senza autostart.
 - Salvare nel progetto il report di verifica e lo stato di handoff per Claude Code.
+
+## Stato al 22/09/2026 notte (Claude Code)
+
+Fase 3 fatta, non ancora in commit.
+
+- Codice: `lab/backend/fruitfly_lab/archive/` (catalog, store, recorder, replay, bundle). Archivio in `lab/data/archive`.
+- Immutabilita dentro SQLite con trigger: niente DELETE, run chiuse non modificabili, transizioni di stato controllate.
+- Oggetti SHA-256 in `objects/ab/cd/<sha>`, sola lettura, pubblicati con `os.replace` e journal `ingest.jsonl` per il crash.
+- Ogni Avvia apre una run; Arresta, Reset e chiusura la sigillano. Crash: al riavvio la run diventa `interrupted` con i file parziali conservati.
+- Registrazione ogni 100 passi (100 Hz simulati). Misurato: circa 12 kB a fotogramma, 1,2 MB per secondo simulato.
+- API: `/api/archive`, `/api/runs`. Pannello Archivio nell'interfaccia.
+- Corretto bug della fase 2: `crypto.randomUUID` non esiste su http LAN, i pulsanti dal telefono non mandavano niente.
+- Test: 19 su 19 (`python -m unittest discover -s tests` da `lab/backend`), compresa run vera col motore e crash prima e dopo `os.replace`.
+- Avvio: da `lab/backend` `..\..\venv\Scripts\python.exe -m fruitfly_lab.server --data-dir ..\data\runtime`.
+
+Prossimo: fase 4, prova vera da iPhone/iPad sulla stessa Wi-Fi e sessione di 30 minuti.

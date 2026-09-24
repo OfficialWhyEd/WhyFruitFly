@@ -19,9 +19,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
+from .archive.catalog import Catalog
+from .archive.recorder import DEFAULT_MARGIN_BYTES, free_bytes
 from .service import EngineService
 
 DEFAULT_PORT = 8765
+DEFAULT_ARCHIVE_DIR = Path(__file__).resolve().parents[2] / "data" / "archive"
 SESSION_COOKIE = "fruitfly_session"
 ALLOWED_COMMANDS = {"start", "pause", "stop", "reset"}
 
@@ -57,9 +60,14 @@ def write_connection_info(output_dir: Path, join_url: str) -> None:
     qrcode.make(join_url).save(output_dir / "connection-qr.png")
 
 
-def create_app(*, start_worker: bool = True, session_token: str | None = None) -> FastAPI:
+def create_app(
+    *,
+    start_worker: bool = True,
+    session_token: str | None = None,
+    archive_dir: Path | None = DEFAULT_ARCHIVE_DIR,
+) -> FastAPI:
     token = session_token or secrets.token_urlsafe(9)
-    service = EngineService() if start_worker else None
+    service = EngineService(archive_dir) if start_worker else None
     frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
     @asynccontextmanager
@@ -131,6 +139,59 @@ def create_app(*, start_worker: bool = True, session_token: str | None = None) -
                 ),
             }
         )
+
+    def authorized(session: str | None) -> bool:
+        return session is not None and secrets.compare_digest(session, token)
+
+    def open_catalog() -> Catalog | None:
+        if archive_dir is None or not (Path(archive_dir) / "catalog.sqlite").is_file():
+            return None
+        return Catalog(Path(archive_dir) / "catalog.sqlite", read_only=True)
+
+    @app.get("/api/archive")
+    async def api_archive(
+        session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+    ) -> JSONResponse:
+        if not authorized(session):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+        info: dict[str, Any] = {
+            "enabled": archive_dir is not None,
+            "recording_run_id": service.recording_run_id if service else None,
+            "last_event": service.last_archive_event if service else None,
+            "runs": 0,
+            "stored_bytes": 0,
+        }
+        if archive_dir is not None:
+            Path(archive_dir).mkdir(parents=True, exist_ok=True)
+            info["free_bytes"] = free_bytes(Path(archive_dir))
+            info["margin_bytes"] = DEFAULT_MARGIN_BYTES
+        catalog = open_catalog()
+        if catalog is not None:
+            try:
+                db = catalog.conn
+                info["runs"] = db.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+                info["stored_bytes"] = db.execute("SELECT COALESCE(SUM(size_bytes), 0) FROM blobs").fetchone()[0]
+                info["by_state"] = {
+                    row[0]: row[1] for row in db.execute("SELECT state, COUNT(*) FROM runs GROUP BY state")
+                }
+            finally:
+                catalog.close()
+        return JSONResponse(info)
+
+    @app.get("/api/runs")
+    async def api_runs(
+        limit: int = 50,
+        session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+    ) -> JSONResponse:
+        if not authorized(session):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+        catalog = open_catalog()
+        if catalog is None:
+            return JSONResponse({"runs": []})
+        try:
+            return JSONResponse({"runs": catalog.list_runs(max(1, min(limit, 500)))})
+        finally:
+            catalog.close()
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:

@@ -7,23 +7,29 @@ import multiprocessing as mp
 import queue
 import uuid
 from collections import deque
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from .worker import run_engine_worker
+
+SHUTDOWN_TIMEOUT_S = 180.0
 
 Subscriber = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 class EngineService:
-    def __init__(self) -> None:
+    def __init__(self, archive_dir: Path | None = None) -> None:
         context = mp.get_context("spawn")
         self.commands = context.Queue(maxsize=128)
         self.events = context.Queue(maxsize=16)
         self.process = context.Process(
             target=run_engine_worker,
             args=(self.commands, self.events),
+            kwargs={"archive_dir": str(archive_dir) if archive_dir else None},
             name="fruitfly-engine",
         )
+        self.recording_run_id: str | None = None
+        self.last_archive_event: dict[str, Any] | None = None
         self.subscribers: set[Subscriber] = set()
         self.recent_request_ids: deque[str] = deque(maxlen=1024)
         self.metadata: dict[str, Any] | None = None
@@ -45,7 +51,8 @@ class EngineService:
                 )
             except queue.Full:
                 pass
-            await asyncio.to_thread(self.process.join, 5.0)
+            # Sealing a long run (Parquet close, MCAP re-read, hashes) can take a while.
+            await asyncio.to_thread(self.process.join, SHUTDOWN_TIMEOUT_S)
             if self.process.is_alive():
                 self.process.terminate()
                 await asyncio.to_thread(self.process.join, 2.0)
@@ -75,6 +82,13 @@ class EngineService:
                 self.latest_snapshot = message["payload"]
             elif kind == "heartbeat":
                 self.last_heartbeat = message
+                self.recording_run_id = message.get("recording_run_id")
+            elif kind == "archive":
+                self.last_archive_event = message
+                if message.get("event") == "recording":
+                    self.recording_run_id = message.get("run_id")
+                elif message.get("event") in ("sealed", "failed"):
+                    self.recording_run_id = None
             elif kind == "fatal":
                 self.fatal_error = message.get("error", "unknown engine error")
             dead: list[Subscriber] = []

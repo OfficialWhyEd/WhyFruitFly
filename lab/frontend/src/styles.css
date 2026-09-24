@@ -97,6 +97,20 @@ dd { margin: 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size
 
 .error-strip { padding: 10px 12px; border: 1px solid var(--vermillion); color: #8f2b1c; font-size: 13px; }
 
+.archive { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--ink); }
+.archive-rec { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.archive-rec--on { color: var(--vermillion); }
+.archive dl div { padding: 8px 0; }
+.run-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.run-list li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.run-list code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; }
+.run-list span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.run-list span:nth-of-type(1) { text-align: right; }
+.run-list li[data-state='sealed'] span:nth-of-type(1) { color: var(--green); }
+.run-list li[data-state='failed'] span:nth-of-type(1), .run-list li[data-state='interrupted'] span:nth-of-type(1) { color: var(--vermillion); }
+.archive-strip { display: none; }
+.rec-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--line); vertical-align: 1px; }
+.rec-dot--on { background: var(--vermillion); }
 @media (max-width: 760px) {
   .lab-shell { grid-template-rows: auto minmax(0, 1fr) auto; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); gap: 10px; }
   .topbar { align-items: center; padding-bottom: 10px; }
@@ -110,6 +124,8 @@ dd { margin: 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size
   .measurements dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 12px; }
   .measurements dl div:nth-child(n+3) { display: none; }
   .experiment-note { display: none; }
+  .archive-strip { display: block; grid-row: 3; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 650; }
+  .workspace { grid-template-rows: minmax(330px, 1fr) auto auto; }
   .control-rail { position: sticky; bottom: max(0px, env(safe-area-inset-bottom)); grid-template-columns: repeat(4, 1fr); background: var(--paper); z-index: 4; }
   .control-rail button { min-height: 60px; flex-direction: column; gap: 3px; font-size: 11px; }
 }

@@ -49,7 +49,7 @@ telefono ─► lab/frontend (React + three.js) ─► WebSocket + token
 # laboratorio
 cd lab/backend
 pip install -e .
-fruitfly-lab --port 8765 --data-dir ../data/runtime
+fruitfly-lab            # link, QR e archivio in lab/data, da qualunque cartella
 
 cd lab/frontend
 npm install
@@ -63,7 +63,8 @@ Il corpo viene da [NeuroMechFly / flygym](https://github.com/NeLy-EPFL/flygym) d
 - fase 1, motore: fatta;
 - fase 2, server nella rete di casa e interfaccia 3D: fatta;
 - fase 3, archivio immutabile: scritta con i test;
-- da fare: sistemare l'avvio del server, prova vera da iPhone e iPad, campagne di esperimenti, connectome
+- avvio del server sistemato: indirizzo LAN giusto, cartelle fisse (`--data-dir`, `--archive-dir`);
+- da fare: prova vera da iPhone e iPad, campagne di esperimenti, connectome
   collegato ad Aphelios.
 
 Costruito a quattro mani: Codex per le fasi 1 e 2, Claude Code per il resto.

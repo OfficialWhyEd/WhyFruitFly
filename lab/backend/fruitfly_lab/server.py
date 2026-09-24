@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import ipaddress
 import json
 import secrets
 import socket
@@ -24,7 +25,9 @@ from .archive.recorder import DEFAULT_MARGIN_BYTES, free_bytes
 from .service import EngineService
 
 DEFAULT_PORT = 8765
-DEFAULT_ARCHIVE_DIR = Path(__file__).resolve().parents[2] / "data" / "archive"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DEFAULT_ARCHIVE_DIR = DEFAULT_DATA_DIR / "archive"
+DEFAULT_RUNTIME_DIR = DEFAULT_DATA_DIR / "runtime"
 SESSION_COOKIE = "fruitfly_session"
 ALLOWED_COMMANDS = {"start", "pause", "stop", "reset"}
 
@@ -35,20 +38,30 @@ class CommandMessage(BaseModel):
     request_id: uuid.UUID
 
 
+def _usable_lan_ip(candidate: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(candidate)
+    except ValueError:
+        return False
+    return ip.version == 4 and ip.is_private and not ip.is_loopback and not ip.is_link_local
+
+
 def discover_lan_ip() -> str:
-    candidates = socket.gethostbyname_ex(socket.gethostname())[2]
-    private = [
-        ip
-        for ip in candidates
-        if ip.startswith("192.168.")
-        or ip.startswith("10.")
-        or ip.startswith("172.16.")
-        or ip.startswith("172.17.")
-        or ip.startswith("172.18.")
-        or ip.startswith("172.19.")
-        or ip.startswith("172.2")
-        or ip.startswith("172.3")
-    ]
+    # The address of the interface that routes outward is the one the phone can reach.
+    # A UDP connect sends no packet; it only asks the OS to pick the route.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("192.168.0.1", 9))
+            routed = probe.getsockname()[0]
+        if _usable_lan_ip(routed):
+            return routed
+    except OSError:
+        pass
+    try:
+        candidates = socket.gethostbyname_ex(socket.gethostname())[2]
+    except OSError:
+        candidates = []
+    private = [ip for ip in candidates if _usable_lan_ip(ip)]
     return private[0] if private else "127.0.0.1"
 
 
@@ -256,7 +269,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run Fruit Fly Lab on the local network")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--data-dir", type=Path, default=Path("lab/data/runtime"))
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=DEFAULT_RUNTIME_DIR,
+        help="where connection.json and connection-qr.png are written",
+    )
+    parser.add_argument("--archive-dir", type=Path, default=DEFAULT_ARCHIVE_DIR)
     args = parser.parse_args()
 
     token = secrets.token_urlsafe(9)
@@ -264,7 +283,11 @@ def main() -> None:
     join_url = f"http://{lan_ip}:{args.port}/join/{token}"
     write_connection_info(args.data_dir, join_url)
     print(f"Fruit Fly Lab: {join_url}")
-    app = create_app(session_token=token)
+    print(f"QR: {(args.data_dir / 'connection-qr.png').resolve()}")
+    print(f"Archivio: {args.archive_dir.resolve()}")
+    if lan_ip == "127.0.0.1":
+        print("Attenzione: nessun indirizzo LAN trovato, il telefono non potra collegarsi.")
+    app = create_app(session_token=token, archive_dir=args.archive_dir)
     uvicorn.run(app, host=args.host, port=args.port, access_log=False)
 
 

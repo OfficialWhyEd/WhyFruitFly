@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
+from fruitfly_lab import server
 from fruitfly_lab.server import create_app
 
 
@@ -26,6 +28,24 @@ class ServerTests(unittest.TestCase):
             response = client.get("/join/wrong", follow_redirects=False)
             self.assertEqual(response.status_code, 303)
             self.assertNotIn("fruitfly_session", response.cookies)
+
+
+class LanIpTests(unittest.TestCase):
+    def test_only_private_non_loopback_ipv4_is_usable(self) -> None:
+        for ip in ("192.168.1.20", "10.0.0.5", "172.16.0.1", "172.31.255.1"):
+            self.assertTrue(server._usable_lan_ip(ip), ip)
+        for ip in ("127.0.0.1", "127.0.1.1", "169.254.3.4", "172.200.1.1", "8.8.8.8", "::1", "nope"):
+            self.assertFalse(server._usable_lan_ip(ip), ip)
+
+    def test_falls_back_to_hostname_then_loopback(self) -> None:
+        with mock.patch.object(server.socket, "socket", side_effect=OSError), mock.patch.object(
+            server.socket, "gethostbyname_ex", return_value=("pc", [], ["127.0.1.1", "192.168.1.7"])
+        ):
+            self.assertEqual(server.discover_lan_ip(), "192.168.1.7")
+        with mock.patch.object(server.socket, "socket", side_effect=OSError), mock.patch.object(
+            server.socket, "gethostbyname_ex", side_effect=OSError
+        ):
+            self.assertEqual(server.discover_lan_ip(), "127.0.0.1")
 
 
 if __name__ == "__main__":

@@ -13,3 +13,5 @@ dati/
 .env*
 config.json
 *.bak*
+lab/data/
+*.egg-info/
